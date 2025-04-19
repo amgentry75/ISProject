@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go Fish Game</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f2f2f2; padding: 20px; }
+        #game { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 10px; }
+        .player-section { margin-bottom: 20px; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar" id="mainNav">
+        <div class="container">
+            <a class="navbar-brand" href="index.html">Back to Home</a>
+            <div class="navbar-nav">
+                <a class="nav-link" href="god.html">My Love for the Gospel</a>
+                <a class="nav-link" href="school.html">Résumé</a>
+            </div>
+    <div id="game">
+        <h1>🎣 Go Fish!</h1>
+        <div id="setup">
+            <label>How many players? <input type="number" id="numPlayers" min="2" max="6"></label>
+            <div id="playerNames"></div>
+            <button onclick="startGame()">Start Game</button>
+        </div>
+        <div id="gameplay" class="hidden">
+            <h2 id="turnTitle"></h2>
+            <div id="hand"></div>
+            <label for="targetPlayer">Ask player: </label>
+            <select id="targetPlayer"></select>
+            <label for="rankSelect">for rank: </label>
+            <select id="rankSelect"></select>
+            <button onclick="makeMove()">Ask</button>
+            <p id="result"></p>
+            <div id="books"></div>
+        </div>
+    </div>
+
+    <script>
+        const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+        const SUITS = ['Hearts', 'Diamonds', 'Clubs', 'Spades'];
+
+        let players = [];
+        let deck = [];
+        let currentPlayer = 0;
+
+        class Card {
+            constructor(rank, suit) {
+                this.rank = rank;
+                this.suit = suit;
+            }
+        }
+
+        class Player {
+            constructor(name) {
+                this.name = name;
+                this.hand = [];
+                this.books = [];
+            }
+
+            hasRank(rank) {
+                return this.hand.some(card => card.rank === rank);
+            }
+
+            giveAllRank(rank) {
+                const matches = this.hand.filter(card => card.rank === rank);
+                this.hand = this.hand.filter(card => card.rank !== rank);
+                return matches;
+            }
+
+            drawCard() {
+                if (deck.length > 0) {
+                    this.hand.push(deck.pop());
+                }
+            }
+
+            checkBooks() {
+                const count = {};
+                this.hand.forEach(card => count[card.rank] = (count[card.rank] || 0) + 1);
+                for (let rank in count) {
+                    if (count[rank] === 4) {
+                        this.books.push(rank);
+                        this.hand = this.hand.filter(c => c.rank !== rank);
+                        document.getElementById("result").innerText = `${this.name} completed a book of ${rank}s!`;
+                    }
+                }
+            }
+        }
+
+        function buildDeck() {
+            deck = [];
+            for (let suit of SUITS) {
+                for (let rank of RANKS) {
+                    deck.push(new Card(rank, suit));
+                }
+            }
+            deck.sort(() => Math.random() - 0.5);
+        }
+
+        function startGame() {
+            const num = parseInt(document.getElementById('numPlayers').value);
+            if (!num || num < 2) return alert('Enter at least 2 players.');
+
+            players = [];
+            const nameDiv = document.getElementById('playerNames');
+            nameDiv.innerHTML = '';
+            for (let i = 0; i < num; i++) {
+                const input = document.createElement('input');
+                input.placeholder = `Player ${i + 1} name`;
+                input.id = `player${i}`;
+                nameDiv.appendChild(input);
+                nameDiv.appendChild(document.createElement('br'));
+            }
+
+            const button = document.createElement('button');
+            button.innerText = 'Confirm Players';
+            button.onclick = setupPlayers;
+            nameDiv.appendChild(button);
+        }
+
+        function setupPlayers() {
+            let num = parseInt(document.getElementById('numPlayers').value);
+            players = [];
+            for (let i = 0; i < num; i++) {
+                let name = document.getElementById(`player${i}`).value || `Player ${i + 1}`;
+                players.push(new Player(name));
+            }
+
+            buildDeck();
+            const cardsToDeal = num === 2 ? 7 : 5;
+            for (let i = 0; i < cardsToDeal; i++) {
+                players.forEach(p => p.drawCard());
+            }
+
+            document.getElementById('setup').classList.add('hidden');
+            document.getElementById('gameplay').classList.remove('hidden');
+            updateGame();
+        }
+
+        function updateGame() {
+            const player = players[currentPlayer];
+            document.getElementById('turnTitle').innerText = `${player.name}'s Turn`;
+            document.getElementById('hand').innerText = 'Your hand: ' + player.hand.map(c => c.rank).join(', ');
+
+            const targetPlayerSelect = document.getElementById('targetPlayer');
+            targetPlayerSelect.innerHTML = '';
+            players.forEach((p, i) => {
+                if (i !== currentPlayer && p.hand.length > 0) {
+                    const opt = document.createElement('option');
+                    opt.value = i;
+                    opt.innerText = p.name;
+                    targetPlayerSelect.appendChild(opt);
+                }
+            });
+
+            const rankSelect = document.getElementById('rankSelect');
+            rankSelect.innerHTML = '';
+            let uniqueRanks = [...new Set(player.hand.map(c => c.rank))];
+            uniqueRanks.forEach(rank => {
+                const opt = document.createElement('option');
+                opt.value = rank;
+                opt.innerText = rank;
+                rankSelect.appendChild(opt);
+            });
+
+            document.getElementById('books').innerText = players.map(p => `${p.name}: ${p.books.length} books`).join(' | ');
+        }
+
+        function makeMove() {
+            const asker = players[currentPlayer];
+            const target = players[parseInt(document.getElementById('targetPlayer').value)];
+            const rank = document.getElementById('rankSelect').value;
+
+            if (target.hasRank(rank)) {
+                let taken = target.giveAllRank(rank);
+                asker.hand.push(...taken);
+                document.getElementById('result').innerText = `${target.name} gave ${taken.length} ${rank}(s)!`;
+                asker.checkBooks();
+                updateGame();
+            } else {
+                document.getElementById('result').innerText = `${target.name} says: Go Fish!`;
+                let drawn = deck.pop();
+                if (drawn) {
+                    asker.hand.push(drawn);
+                    document.getElementById('result').innerText += ` You drew a ${drawn.rank}.`;
+                    if (drawn.rank === rank) {
+                        document.getElementById('result').innerText += ` You drew the card you asked for! Go again!`;
+                        asker.checkBooks();
+                        updateGame();
+                        return;
+                    }
+                }
+                asker.checkBooks();
+                currentPlayer = (currentPlayer + 1) % players.length;
+                updateGame();
+            }
+        }
+    </script>
+</body>
+</html>
+
